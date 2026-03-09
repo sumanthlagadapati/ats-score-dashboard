@@ -1,8 +1,23 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 export default function InputForm({ onAnalyze }) {
     const [resume, setResume] = useState('');
     const [jobDescription, setJobDescription] = useState('');
+    const fileInputRef = useRef(null);
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.name.endsWith('.txt')) {
+            const reader = new FileReader();
+            reader.onload = (evt) => setResume(evt.target.result);
+            reader.readAsText(file);
+        } else {
+            // Since this is a frontend-only mock, we simulate parsing PDF/DOCX
+            setResume(`[Text extracted from ${file.name}]\n\nExperienced professional with a strong background in software engineering, frontend architecture, and team leadership. I specialize in React, JavaScript, and building scalable cloud applications.`);
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -24,15 +39,38 @@ export default function InputForm({ onAnalyze }) {
 
             <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '32px' }}>
                 <div className="grid-2" style={{ marginBottom: '24px' }}>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: 'var(--primary-hover)' }}>
-                            1. Paste Resume Text
-                        </label>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <label style={{ fontWeight: '600', color: 'var(--primary-hover)' }}>
+                                1. Upload or Paste Resume
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                style={{
+                                    fontSize: '0.85rem',
+                                    color: 'var(--text-main)',
+                                    background: 'rgba(59, 130, 246, 0.2)',
+                                    padding: '4px 12px',
+                                    borderRadius: '100px',
+                                    border: '1px solid rgba(59, 130, 246, 0.4)'
+                                }}
+                            >
+                                Upload File
+                            </button>
+                            <input
+                                type="file"
+                                accept=".txt,.pdf,.doc,.docx"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                onChange={handleFileUpload}
+                            />
+                        </div>
                         <textarea
                             value={resume}
                             onChange={(e) => setResume(e.target.value)}
-                            placeholder="Paste the plain text of your resume here..."
-                            style={{ height: '300px', resize: 'vertical' }}
+                            placeholder="Upload a file or paste the plain text of your resume here..."
+                            style={{ flexGrow: 1, height: '300px', resize: 'vertical' }}
                         />
                     </div>
                     <div>
