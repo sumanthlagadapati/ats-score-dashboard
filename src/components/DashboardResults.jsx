@@ -96,10 +96,31 @@ export default function DashboardResults({ results, onReset }) {
                     </div>
 
                     <div style={{ marginTop: '32px', padding: '16px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', borderLeft: '4px solid var(--primary)' }}>
-                        <h4 style={{ marginBottom: '8px', color: 'var(--primary-hover)' }}>Recommendation</h4>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-                            Try seamlessly integrating the missing keywords into your experience bullet points, ensuring they flow naturally. Combine them with measurable outcomes where possible.
+                        <h4 style={{ marginBottom: '16px', color: 'var(--primary-hover)' }}>How to Improve</h4>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '16px' }}>
+                            Try seamlessly integrating the following missing keywords into your experience bullet points. Combine them with measurable outcomes where possible.
                         </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {results.keywordSuggestions && results.keywordSuggestions.map((suggestion, i) => (
+                                <div key={i} style={{
+                                    background: 'var(--bg-card)',
+                                    padding: '12px 16px',
+                                    borderRadius: '6px',
+                                    border: '1px solid var(--glass-border)',
+                                    fontSize: '0.9rem',
+                                    color: 'var(--text-main)'
+                                }}>
+                                    <span style={{
+                                        color: 'var(--warning)',
+                                        marginRight: '8px',
+                                        fontWeight: 'bold'
+                                    }}>Tip:</span>
+                                    {/* Simple dangerouslySetInnerHTML alternative for bolding the keyword */}
+                                    <span dangerouslySetInnerHTML={{ __html: suggestion.replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--accent);">$1</strong>') }} />
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

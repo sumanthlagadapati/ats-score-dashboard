@@ -39,6 +39,11 @@ function App() {
         missing.push("agile", "strategic planning", "budgeting");
       }
 
+      // Generate suggested bullet points for missing keywords
+      const suggestions = missing.map(kw => {
+        return `Add a bullet point demonstrating your experience with **${kw}**. For example: "Spearheaded [Project] utilizing ${kw} to improve [Metric] by [X]%."`;
+      });
+
       const keywordRatio = matched.length / (matched.length + missing.length || 1);
       const overall = Math.floor(50 + (keywordRatio * 40) + (Math.random() * 10)); // realistic looking score
 
@@ -49,7 +54,11 @@ function App() {
         actionScore: 85, // Mock action verb score
         impactScore: 78,  // Mock impact metric score
         matchedKeywords: matched.length > 0 ? matched : ["react", "javascript", "frontend"],
-        missingKeywords: missing.length > 0 ? missing : ["typescript", "testing", "graphql"]
+        missingKeywords: missing.length > 0 ? missing : ["typescript", "testing", "graphql"],
+        keywordSuggestions: suggestions.length > 0 ? suggestions : [
+          "Add a bullet point demonstrating your experience with **typescript**. For example: 'Migrated legacy codebase to typescript, reducing runtime errors by 40%.'",
+          "Include your **testing** experience: 'Implemented comprehensive unit testing using Jest and React Testing Library, achieving 90% code coverage.'"
+        ]
       });
 
       setMode('results');
