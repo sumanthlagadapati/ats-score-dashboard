@@ -4,6 +4,121 @@ import InputForm from './components/InputForm';
 import LoadingOverlay from './components/LoadingOverlay';
 import DashboardResults from './components/DashboardResults';
 
+// ─── ATS Resume Rewriter ─────────────────────────────────────────────────────
+// Parses the real resume, identifies sections, rewrites each with missing keywords
+function buildRewrittenResume(resume, matched, missing, jd) {
+  const lines = resume.split('\n');
+
+  // ── 1. Extract header block (name + contact on first 5 lines) ──────────────
+  const headerLines = [];
+  let bodyStartIdx = 0;
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    const l = lines[i].trim();
+    // Stop at first obvious section heading
+    if (/^(PROFESSIONAL SUMMARY|SUMMARY|TECHNICAL SKILLS|SKILLS|EXPERIENCE|EDUCATION|CERTIFICATIONS)/i.test(l) && i > 0) {
+      bodyStartIdx = i;
+      break;
+    }
+    headerLines.push(l);
+    bodyStartIdx = i + 1;
+  }
+
+  // ── 2. Split remaining resumeinto named sections ───────────────────────────
+  const SECTION_RE = /^(PROFESSIONAL SUMMARY|SUMMARY|TECHNICAL SKILLS|SKILLS|CORE COMPETENCIES|PROFESSIONAL EXPERIENCE|EXPERIENCE|EDUCATION|CERTIFICATIONS?|AWARDS?|PROJECTS?)/i;
+
+  const sections = []; // [{ name, lines }]
+  let currentSection = null;
+
+  for (let i = bodyStartIdx; i < lines.length; i++) {
+    const l = lines[i];
+    if (SECTION_RE.test(l.trim())) {
+      if (currentSection) sections.push(currentSection);
+      currentSection = { name: l.trim(), lines: [] };
+    } else {
+      if (!currentSection) currentSection = { name: '__PREAMBLE__', lines: [] };
+      currentSection.lines.push(l);
+    }
+  }
+  if (currentSection) sections.push(currentSection);
+
+  // ── 3. Rewrite each section ────────────────────────────────────────────────
+  const rewriteSection = (section) => {
+    const name = section.name.toUpperCase();
+
+    // Professional Summary: add missing keywords naturally
+    if (/SUMMARY/.test(name)) {
+      const originalParas = section.lines.join('\n').trim();
+      // Append a sentence that naturally includes missing keywords
+      let extra = '';
+      if (missing.length > 0) {
+        const kwStr = missing.slice(0, 4).join(', ');
+        extra = ` Actively expanding expertise in ${kwStr} to deliver end-to-end solutions aligned with current industry standards.`;
+      }
+      return `${section.name}\n${originalParas}${extra}`;
+    }
+
+    // Core Competencies / Technical Skills: append missing keywords to the list
+    if (/COMPETENCIES|SKILLS/.test(name)) {
+      const original = section.lines.join('\n').trim();
+      const toAdd = missing.filter(k => !original.toLowerCase().includes(k.toLowerCase()));
+      if (toAdd.length === 0) return `${section.name}\n${original}`;
+      return `${section.name}\n${original}\n\nADDITIONAL JD-ALIGNED KEYWORDS\n${toAdd.join('  •  ')}`;
+    }
+
+    // Experience: find the LAST bullet of the first role and insert new JD-aligned bullets
+    if (/EXPERIENCE/.test(name)) {
+      const expLines = [...section.lines];
+      // Find first role's bullet block and append new lines
+      const bulletsToAdd = missing.slice(0, 3).map((kw, idx) => {
+        const actions = ['Implemented', 'Leveraged', 'Integrated', 'Spearheaded', 'Designed'];
+        const verbs = actions[idx % actions.length];
+        return `•\t${verbs} ${kw} capabilities to enhance platform reliability, streamline automation workflows, and align with evolving organizational requirements.`;
+      });
+      // Find the index of the first blank line after the first block of bullets
+      let insertAt = expLines.length;
+      let foundBullet = false;
+      for (let i = 0; i < expLines.length; i++) {
+        if (expLines[i].trim().startsWith('•') || expLines[i].trim().startsWith('-')) foundBullet = true;
+        if (foundBullet && expLines[i].trim() === '' && i > 0) {
+          insertAt = i;
+          break;
+        }
+      }
+      expLines.splice(insertAt, 0, '', '// ATS-OPTIMIZED ADDITIONS (Job Description Alignment)', ...bulletsToAdd);
+      return `${section.name}\n${expLines.join('\n')}`;
+    }
+
+    // Education / Certifications / everything else: keep verbatim
+    return `${section.name}\n${section.lines.join('\n')}`;
+  };
+
+  // ── 4. Assemble the final document ────────────────────────────────────────
+  const rewritten = [
+    headerLines.join('\n'),
+    '',
+    ...sections.map(rewriteSection),
+  ].join('\n\n').trim();
+
+  return rewritten;
+}
+
+// ─── Keyword Extractor ────────────────────────────────────────────────────────
+// A broader keyword list covering tech, methodologies, tools, and soft skills
+const KEYWORD_LIBRARY = [
+  "react", "javascript", "typescript", "python", "java", "golang", "node", "sql", "nosql", "graphql", "rest", "grpc", "kafka", "redis",
+  "docker", "kubernetes", "terraform", "ansible", "helm", "argocd", "packer", "cloudformation",
+  "aws", "azure", "gcp", "cloud", "devops", "devsecops", "sre", "reliability", "observability", "monitoring", "tracing", "logging",
+  "opentelemetry", "otel", "prometheus", "grafana", "splunk", "datadog", "newrelic", "dynatrace", "elastic", "kibana", "jaeger", "zipkin", "loki",
+  "jenkins", "github", "gitlab", "cicd", "pipeline", "ci/cd", "gitops", "deployment", "release",
+  "llm", "ai", "ml", "gpt", "openai", "langchain", "rag", "vector", "embedding", "inference", "finetuning", "agents", "evaluation", "drift",
+  "security", "rbac", "iam", "hipaa", "compliance", "soc2", "fedramp", "pii", "zero trust", "oauth", "okta", "ldap", "mfa",
+  "agile", "scrum", "kanban", "leadership", "management", "strategy", "planning", "collaboration", "communication",
+  "marklogic", "postgresql", "mysql", "dynamodb", "cassandra", "mongodb", "s3", "sqs", "sns", "eventbridge", "lambda", "ecs", "eks", "gke", "aks",
+  "performance", "latency", "slo", "sla", "mttr", "incident", "postmortem", "oncall", "capacity", "scaling", "autoscaling",
+  "networking", "vpn", "expressroute", "vnet", "loadbalancer", "firewalls", "bgp", "dns", "cdn",
+  "finops", "cost", "optimization", "rightsizing", "budgeting"
+];
+
 function App() {
   const [mode, setMode] = useState('input'); // 'input' | 'loading' | 'results'
   const [results, setResults] = useState(null);
@@ -11,82 +126,55 @@ function App() {
   const analyzeResume = (resume, jd) => {
     setMode('loading');
 
-    // Simulate API call and mock analysis logic
     setTimeout(() => {
-      // Very basic keyword extraction logic (just for visual representation in mock)
-      const jdWords = jd.toLowerCase().match(/\b(\w+)\b/g) || [];
-      const resumeWords = resume.toLowerCase().match(/\b(\w+)\b/g) || [];
+      const jdLower = jd.toLowerCase();
+      const resumeLower = resume.toLowerCase();
 
-      // Look for some dummy tech keywords or common words larger than 4 chars
-      const techKeywords = ["react", "javascript", "cloud", "azure", "aws", "python", "agile", "sql", "api", "docker", "kubernetes", "ci/cd", "management", "leadership", "design", "development"];
+      // Find every keyword from our library that appears in the JD
+      const jdKeywords = KEYWORD_LIBRARY.filter(kw => jdLower.includes(kw));
 
-      const expectedKeywords = [...new Set(jdWords.filter(w => techKeywords.includes(w) || w.length > 6))].slice(0, 15);
-
+      // Split into matched vs missing
       const matched = [];
       const missing = [];
-
-      expectedKeywords.forEach(kw => {
-        if (resumeWords.includes(kw)) {
-          matched.push(kw);
-        } else {
-          missing.push(kw);
-        }
+      jdKeywords.forEach(kw => {
+        if (resumeLower.includes(kw)) matched.push(kw);
+        else missing.push(kw);
       });
 
-      // If none found by logic, provide some dummy data
-      if (expectedKeywords.length === 0) {
-        matched.push("leadership", "management", "communication");
-        missing.push("agile", "strategic planning", "budgeting");
+      // Fallback
+      if (jdKeywords.length === 0) {
+        matched.push('leadership', 'management', 'collaboration');
+        missing.push('agile', 'strategic planning', 'budgeting');
       }
 
-      // Generate suggested bullet points for missing keywords
+      // Suggestions per missing keyword
       const suggestions = missing.map(kw => {
-        return `Add a bullet point demonstrating your experience with **${kw}**. For example: "Spearheaded [Project] utilizing ${kw} to improve [Metric] by [X]%."`;
+        return `Add a bullet point for **${kw}**. Example: "Leveraged ${kw} to improve [Metric] by [X]% in production environment."`;
       });
 
-      // Generate a mocked "Rewritten Resume" string
-      const rewrittenResumeText = `
-${resume.split('\n')[0] || "Candidate Name"}
-Optimized for ATS Parsing
-
-PROFESSIONAL SUMMARY
-Highly skilled professional with expertise in ${matched.join(', ')}. Proven ability to adapt to new environments and master critical skills including ${missing.join(', ')}. Strongly aligned with core requirements for this role.
-
-CORE COMPETENCIES
-${[...matched, ...missing].join(' • ')}
-
-PROFESSIONAL EXPERIENCE
-Senior Software Engineer | Company Name
-- Engineered robust solutions leveraging ${matched[0] || 'core technologies'}, increasing system efficiency by 25%.
-- Integrated ${missing[0] || 'new methodology'} practices to streamline development workflows.
-- Spearheaded the adoption of ${missing[1] || 'modern tools'} across cross-functional teams, reducing delivery time by 15%.
-- Maintained high standards of code quality and ${matched[1] || 'system design'} for enterprise-scale platforms.
-
-EDUCATION
-Bachelor of Science
-University Name
-`.trim();
+      // Smart rewrite: preserve real resume, inject JD keywords
+      const rewrittenResumeText = buildRewrittenResume(resume, matched, missing, jd);
 
       const keywordRatio = matched.length / (matched.length + missing.length || 1);
-      const overall = Math.floor(50 + (keywordRatio * 40) + (Math.random() * 10)); // realistic looking score
+      const overall = Math.min(100, Math.floor(50 + keywordRatio * 45 + Math.random() * 5));
 
       setResults({
-        overallScore: overall > 100 ? 100 : overall,
-        keywordScore: Math.floor(keywordRatio * 100) || 65,
-        formatScore: 92, // Mock formatting score
-        actionScore: 85, // Mock action verb score
-        impactScore: 78,  // Mock impact metric score
-        matchedKeywords: matched.length > 0 ? matched : ["react", "javascript", "frontend"],
-        missingKeywords: missing.length > 0 ? missing : ["typescript", "testing", "graphql"],
+        overallScore: overall,
+        keywordScore: Math.min(100, Math.floor(keywordRatio * 100)),
+        formatScore: 92,
+        actionScore: 85,
+        impactScore: 78,
+        matchedKeywords: matched,
+        missingKeywords: missing,
         keywordSuggestions: suggestions.length > 0 ? suggestions : [
-          "Add a bullet point demonstrating your experience with **typescript**. For example: 'Migrated legacy codebase to typescript, reducing runtime errors by 40%.'",
-          "Include your **testing** experience: 'Implemented comprehensive unit testing using Jest and React Testing Library, achieving 90% code coverage.'"
+          'Add a bullet for **typescript**: "Migrated codebase to TypeScript, reducing runtime errors by 40%."',
+          'Add a bullet for **testing**: "Achieved 90% code coverage via Jest and React Testing Library."'
         ],
         rewrittenResume: rewrittenResumeText
       });
 
       setMode('results');
-    }, 2500); // 2.5 second loading anticipation
+    }, 2500);
   };
 
   return (
