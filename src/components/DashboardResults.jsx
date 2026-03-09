@@ -124,6 +124,64 @@ export default function DashboardResults({ results, onReset }) {
                     </div>
                 </div>
             </div>
+
+            {/* ── Rewritten Resume Section ── */}
+            {results.rewrittenResume && (
+                <div className="glass-panel animate-fade-in" style={{ padding: '32px', marginTop: '32px' }}>
+                    {/* Header row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                            <h3 style={{ fontSize: '1.5rem', marginBottom: '4px' }}>
+                                ✨ ATS-Optimized Resume
+                            </h3>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                Rewritten to maximise keyword coverage for this job description.
+                            </p>
+                        </div>
+                        <button
+                            className="btn-primary"
+                            onClick={() => {
+                                const blob = new Blob([results.rewrittenResume], { type: 'text/plain' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'ATS_Optimized_Resume.txt';
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            }}
+                            style={{ padding: '10px 24px', fontSize: '1rem', whiteSpace: 'nowrap' }}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download .txt
+                        </button>
+                    </div>
+
+                    {/* Divider */}
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', marginBottom: '20px' }} />
+
+                    {/* Preview */}
+                    <pre style={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        fontFamily: "'Outfit', sans-serif",
+                        fontSize: '0.9rem',
+                        lineHeight: '1.8',
+                        color: 'var(--text-main)',
+                        background: 'rgba(15, 23, 42, 0.5)',
+                        padding: '24px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--glass-border)',
+                        maxHeight: '500px',
+                        overflowY: 'auto'
+                    }}>
+                        {results.rewrittenResume}
+                    </pre>
+                </div>
+            )}
         </div>
     );
 }

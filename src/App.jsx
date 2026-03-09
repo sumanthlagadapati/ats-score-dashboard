@@ -44,6 +44,29 @@ function App() {
         return `Add a bullet point demonstrating your experience with **${kw}**. For example: "Spearheaded [Project] utilizing ${kw} to improve [Metric] by [X]%."`;
       });
 
+      // Generate a mocked "Rewritten Resume" string
+      const rewrittenResumeText = `
+${resume.split('\n')[0] || "Candidate Name"}
+Optimized for ATS Parsing
+
+PROFESSIONAL SUMMARY
+Highly skilled professional with expertise in ${matched.join(', ')}. Proven ability to adapt to new environments and master critical skills including ${missing.join(', ')}. Strongly aligned with core requirements for this role.
+
+CORE COMPETENCIES
+${[...matched, ...missing].join(' • ')}
+
+PROFESSIONAL EXPERIENCE
+Senior Software Engineer | Company Name
+- Engineered robust solutions leveraging ${matched[0] || 'core technologies'}, increasing system efficiency by 25%.
+- Integrated ${missing[0] || 'new methodology'} practices to streamline development workflows.
+- Spearheaded the adoption of ${missing[1] || 'modern tools'} across cross-functional teams, reducing delivery time by 15%.
+- Maintained high standards of code quality and ${matched[1] || 'system design'} for enterprise-scale platforms.
+
+EDUCATION
+Bachelor of Science
+University Name
+`.trim();
+
       const keywordRatio = matched.length / (matched.length + missing.length || 1);
       const overall = Math.floor(50 + (keywordRatio * 40) + (Math.random() * 10)); // realistic looking score
 
@@ -58,7 +81,8 @@ function App() {
         keywordSuggestions: suggestions.length > 0 ? suggestions : [
           "Add a bullet point demonstrating your experience with **typescript**. For example: 'Migrated legacy codebase to typescript, reducing runtime errors by 40%.'",
           "Include your **testing** experience: 'Implemented comprehensive unit testing using Jest and React Testing Library, achieving 90% code coverage.'"
-        ]
+        ],
+        rewrittenResume: rewrittenResumeText
       });
 
       setMode('results');
