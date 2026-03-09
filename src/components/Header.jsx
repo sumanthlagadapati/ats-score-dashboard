@@ -1,34 +1,53 @@
+import { Link, useNavigate } from 'react-router-dom';
+
 export default function Header() {
+    const navigate = useNavigate();
+
     return (
         <header style={{
-            padding: '24px 0',
+            position: 'sticky', top: 0, zIndex: 100,
+            background: 'rgba(8,14,26,0.85)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
             borderBottom: '1px solid var(--border-color)',
-            marginBottom: '40px'
         }}>
-            <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '68px' }}>
+                {/* Logo */}
+                <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '10px',
+                        width: '38px', height: '38px', borderRadius: '10px',
                         background: 'linear-gradient(135deg, var(--primary), var(--accent))',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 'bold',
-                        fontSize: '1.2rem'
-                    }}>
-                        A
-                    </div>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: '700' }}>
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: '900', fontSize: '1.1rem', color: '#fff', flexShrink: 0,
+                    }}>A</div>
+                    <span style={{ fontWeight: '800', fontSize: '1.25rem', letterSpacing: '-0.5px' }}>
                         ATS<span className="text-gradient">Match</span>
-                    </h1>
-                </div>
-                <nav style={{ display: 'flex', gap: '20px' }}>
-                    <a href="#" style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.3s' }} onMouseOver={e => e.target.style.color = 'var(--text-main)'} onMouseOut={e => e.target.style.color = 'var(--text-muted)'}>How it works</a>
-                    <a href="#" style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.3s' }} onMouseOver={e => e.target.style.color = 'var(--text-main)'} onMouseOut={e => e.target.style.color = 'var(--text-muted)'}>Pricing</a>
+                    </span>
+                </Link>
+
+                {/* Nav */}
+                <nav style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <NavLink to="/" label="Dashboard" />
+                    <NavLink to="/analyze" label="Analyze" />
+                    <NavLink to="/history" label="History" />
+                    <button
+                        className="btn-primary"
+                        onClick={() => navigate('/analyze')}
+                        style={{ marginLeft: '12px', padding: '8px 20px', fontSize: '.9rem' }}
+                    >
+                        + New Scan
+                    </button>
                 </nav>
             </div>
         </header>
+    );
+}
+
+function NavLink({ to, label }) {
+    const active = window.location.pathname === to;
+    return (
+        <Link to={to} className={`nav-link${active ? ' active' : ''}`}>
+            {label}
+        </Link>
     );
 }

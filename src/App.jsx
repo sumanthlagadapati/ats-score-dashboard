@@ -1,306 +1,209 @@
 import { useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
 import Header from './components/Header';
-import InputForm from './components/InputForm';
 import LoadingOverlay from './components/LoadingOverlay';
-import DashboardResults from './components/DashboardResults';
+import InputForm from './components/InputForm';
 
-// ─── Transformation helpers ───────────────────────────────────────────────────
+import Dashboard from './pages/Dashboard';
+import ResultsPage from './pages/ResultsPage';
+import HistoryPage from './pages/HistoryPage';
 
-const WEAK_TO_STRONG = {
-  'worked on': 'Engineered',
-  'helped': 'Spearheaded',
-  'assisted': 'Co-led',
-  'supported': 'Enabled',
-  'did': 'Executed',
-  'made': 'Developed',
-  'was responsible for': 'Owned',
-  'responsible for': 'Owned',
-  'handled': 'Managed',
-  'dealt with': 'Resolved',
-  'used': 'Leveraged',
-  'utilized': 'Leveraged',
-  'involved in': 'Contributed directly to',
-  'participated in': 'Drove',
-  'helped to': 'Led',
-  'helped with': 'Accelerated',
-};
-
-const POWER_VERBS = [
-  'Architected', 'Engineered', 'Orchestrated', 'Spearheaded', 'Designed',
-  'Deployed', 'Automated', 'Optimized', 'Integrated', 'Implemented',
-  'Established', 'Built', 'Developed', 'Delivered', 'Reduced',
-  'Increased', 'Accelerated', 'Streamlined', 'Migrated', 'Secured',
-];
-
-/**
- * Strengthens a single bullet point:
- *  - Replaces weak verbs with power verbs
- *  - Adds quantification language if no numbers present
- *  - Injects relevant missing keyword if applicable
- */
-function strengthenBullet(bullet, missingKw, idx) {
-  let improved = bullet.replace(/^[•\-\*]\s*/, '').trim();
-
-  // Replace weak openers
-  for (const [weak, strong] of Object.entries(WEAK_TO_STRONG)) {
-    const re = new RegExp(`^${weak}\\b`, 'i');
-    if (re.test(improved)) {
-      improved = improved.replace(re, strong);
-      break;
-    }
-  }
-
-  // If no power verb at the start already, prepend one
-  const firstWord = improved.split(/\s+/)[0].replace(/[,;]/, '');
-  const alreadyStrong = POWER_VERBS.some(v => v.toLowerCase() === firstWord.toLowerCase());
-  if (!alreadyStrong) {
-    const verb = POWER_VERBS[idx % POWER_VERBS.length];
-    // Only prepend if the bullet doesn't already start with a capital action verb
-    if (!/^[A-Z][a-z]+ed|ing\b/.test(improved)) {
-      improved = `${verb} ${improved.charAt(0).toLowerCase()}${improved.slice(1)}`;
-    }
-  }
-
-  // Add impact quantification hint if no numbers exist
-  if (!/\d/.test(improved) && !improved.toLowerCase().includes('percent') && !improved.toLowerCase().includes('x faster')) {
-    const impacts = [
-      ', reducing operational overhead by ~20%',
-      ', improving system reliability by ~30%',
-      ', cutting incident resolution time by ~25%',
-      ', increasing deployment frequency by ~2×',
-      ', eliminating manual toil across the team',
-    ];
-    improved = improved.replace(/[.;,]?\s*$/, impacts[idx % impacts.length] + '.');
-  }
-
-  // Inject a missing JD keyword naturally (one per bullet, cycle through)
-  if (missingKw && !improved.toLowerCase().includes(missingKw.toLowerCase())) {
-    improved = improved.replace(/\.$/, ` — delivering measurable gains in ${missingKw} alignment across the platform.`);
-  }
-
-  return `• ${improved}`;
-}
-
-/**
- * Rewrites the Professional Summary to mirror the JD's language and requirements.
- */
-function rewriteSummary(originalSummary, matched, missing, jd) {
-  // Pull years of experience from original if present
-  const yearsMatch = originalSummary.match(/(\d+\+?\s*years?)/i);
-  const yearsStr = yearsMatch ? yearsMatch[1] : '8+ years';
-
-  // Pull strongest domain signals from JD (first 400 chars — job title / key needs)
-  const jdSnippet = jd.slice(0, 400).toLowerCase();
-  const isDev = /develop|engineer|software|frontend|backend|fullstack/i.test(jdSnippet);
-  const isOps = /devops|sre|reliability|platform|infrastructure|observability/i.test(jdSnippet);
-  const isAI = /ai|ml|llm|machine learning|artificial intelligence|gen.?ai/i.test(jdSnippet);
-  const isCloud = /cloud|aws|azure|gcp|kubernetes/i.test(jdSnippet);
-  const isSec = /security|compliance|hipaa|fedramp|zero trust/i.test(jdSnippet);
-
-  const domain = isAI ? 'AI/ML Engineering and Observability'
-    : isOps ? 'Site Reliability and DevOps Engineering'
-      : isDev ? 'Software Development and Platform Engineering'
-        : isCloud ? 'Cloud Platform Engineering'
-          : isSec ? 'Security and Compliance Engineering'
-            : 'Engineering and Technology';
-
-  const topMatched = matched.slice(0, 5).join(', ') || 'cloud platforms, automation, and distributed systems';
-  const topMissing = missing.slice(0, 3).join(', ');
-
-  const missingSentence = topMissing
-    ? ` Currently deepening expertise in ${topMissing} to fully align with emerging architectural requirements.`
-    : '';
-
-  return `PROFESSIONAL SUMMARY
-Results-driven ${domain} professional with ${yearsStr} of hands-on experience designing, scaling, and operating enterprise-grade systems in high-stakes environments. Proven track record in ${topMatched}, delivering measurable improvements in reliability, performance, and compliance. Known for translating complex technical requirements into production-ready solutions that align with organizational goals and security mandates.${missingSentence}`;
-}
-
-/**
- * Rewrites Core Competencies / Technical Skills section.
- * Re-groups keywords to mirror the JD category structure.
- */
-function rewriteSkills(section, matched, missing) {
-  // Keep original lines but append a new "Job-Aligned Skills" row
-  const original = section.lines.join('\n').trim();
-  const toAdd = missing.filter(k => !original.toLowerCase().includes(k.toLowerCase()));
-  const toHighlight = matched.slice(0, 8);
-
-  let out = `${section.name}\n${original}`;
-
-  if (toHighlight.length > 0) {
-    out += `\n\nHIGH-RELEVANCE MATCHED SKILLS (JD-Aligned)\n${toHighlight.join('  •  ')}`;
-  }
-  if (toAdd.length > 0) {
-    out += `\n\nADDITIONAL JD-REQUIRED SKILLS (Add/Strengthen in Resume)\n${toAdd.join('  •  ')}`;
-  }
-  return out;
-}
-
-/**
- * Rewrites Experience section —
- * strengthens every bullet, injects missing keywords contextually.
- */
-function rewriteExperience(section, missing) {
-  const outputLines = [];
-  let bulletIdx = 0;
-  const kwQueue = [...missing]; // rotate through missing keywords
-
-  for (const line of section.lines) {
-    const trimmed = line.trim();
-    // Role header lines (company | title | dates) — keep as-is
-    if (!trimmed.startsWith('•') && !trimmed.startsWith('-') && !trimmed.startsWith('*')) {
-      outputLines.push(line);
-      continue;
-    }
-    // It's a bullet — strengthen it
-    const kw = kwQueue[bulletIdx % (kwQueue.length || 1)] || null;
-    const improved = strengthenBullet(trimmed, kw, bulletIdx);
-    outputLines.push(improved);
-    bulletIdx++;
-  }
-
-  return `${section.name}\n${outputLines.join('\n')}`;
-}
-
-// ─── Main Rewriter ────────────────────────────────────────────────────────────
-function buildRewrittenResume(resume, matched, missing, jd) {
-  const lines = resume.split('\n');
-
-  // 1. Extract header block (name + contact, first ≤5 lines before any section)
-  const SECTION_RE = /^(PROFESSIONAL SUMMARY|SUMMARY|TECHNICAL SKILLS|SKILLS|CORE COMPETENCIES|PROFESSIONAL EXPERIENCE|EXPERIENCE|EDUCATION|CERTIFICATIONS?|AWARDS?|PROJECTS?)/i;
-  const headerLines = [];
-  let bodyStartIdx = 0;
-  for (let i = 0; i < Math.min(7, lines.length); i++) {
-    if (SECTION_RE.test(lines[i].trim()) && i > 0) { bodyStartIdx = i; break; }
-    headerLines.push(lines[i]);
-    bodyStartIdx = i + 1;
-  }
-
-  // 2. Split body into named sections
-  const sections = [];
-  let current = null;
-  for (let i = bodyStartIdx; i < lines.length; i++) {
-    const l = lines[i];
-    if (SECTION_RE.test(l.trim())) {
-      if (current) sections.push(current);
-      current = { name: l.trim(), lines: [] };
-    } else {
-      if (!current) current = { name: '__PREAMBLE__', lines: [] };
-      current.lines.push(l);
-    }
-  }
-  if (current) sections.push(current);
-
-  // 3. Rewrite each section
-  const rewritten = sections.map(s => {
-    const n = s.name.toUpperCase();
-    if (/SUMMARY/.test(n)) {
-      return rewriteSummary(s.lines.join(' '), matched, missing, jd);
-    }
-    if (/COMPETENCIES|SKILLS/.test(n)) {
-      return rewriteSkills(s, matched, missing);
-    }
-    if (/EXPERIENCE/.test(n)) {
-      return rewriteExperience(s, missing);
-    }
-    // Education, Certifications — verbatim
-    return `${s.name}\n${s.lines.join('\n')}`;
-  });
-
-  return [
-    '════════════════════════════════════════════════════════',
-    '  ATS-OPTIMIZED RESUME  —  Generated by ATSMatch',
-    '════════════════════════════════════════════════════════',
-    '',
-    headerLines.join('\n').trim(),
-    '',
-    ...rewritten,
-    '',
-    '════════════════════════════════════════════════════════',
-    '  NOTE: Review all additions marked above before using.',
-    '════════════════════════════════════════════════════════',
-  ].join('\n\n').trim();
-}
-
-// ─── Keyword Library ──────────────────────────────────────────────────────────
+// ─── Keyword library (100+ terms) ────────────────────────────────────────────
 const KEYWORD_LIBRARY = [
   'react', 'javascript', 'typescript', 'python', 'java', 'golang', 'node', 'sql', 'nosql', 'graphql', 'rest', 'grpc', 'kafka', 'redis',
   'docker', 'kubernetes', 'terraform', 'ansible', 'helm', 'argocd', 'packer', 'cloudformation',
   'aws', 'azure', 'gcp', 'cloud', 'devops', 'devsecops', 'sre', 'reliability', 'observability', 'monitoring', 'tracing', 'logging',
-  'opentelemetry', 'otel', 'prometheus', 'grafana', 'splunk', 'datadog', 'newrelic', 'dynatrace', 'elastic', 'kibana', 'jaeger', 'zipkin', 'loki',
-  'jenkins', 'github', 'gitlab', 'cicd', 'pipeline', 'gitops', 'deployment', 'release',
-  'llm', 'ai', 'ml', 'openai', 'langchain', 'rag', 'vector', 'inference', 'finetuning', 'agents', 'evaluation', 'drift',
-  'security', 'rbac', 'iam', 'hipaa', 'compliance', 'soc2', 'fedramp', 'pii', 'oauth', 'okta', 'ldap', 'mfa',
-  'agile', 'scrum', 'kanban', 'leadership', 'management', 'strategy', 'planning', 'collaboration', 'communication',
-  'marklogic', 'postgresql', 'mysql', 'dynamodb', 'cassandra', 'mongodb', 's3', 'sqs', 'sns', 'lambda', 'ecs', 'eks', 'gke', 'aks',
-  'performance', 'latency', 'slo', 'sla', 'mttr', 'incident', 'postmortem', 'oncall', 'capacity', 'scaling', 'autoscaling',
-  'networking', 'vpn', 'expressroute', 'vnet', 'loadbalancer', 'firewall', 'bgp', 'dns', 'cdn',
+  'opentelemetry', 'otel', 'prometheus', 'grafana', 'splunk', 'datadog', 'newrelic', 'dynatrace', 'elastic', 'kibana', 'jaeger',
+  'jenkins', 'github', 'gitlab', 'cicd', 'pipeline', 'gitops', 'deployment',
+  'llm', 'ai', 'ml', 'openai', 'langchain', 'rag', 'vector', 'inference', 'agents', 'evaluation', 'drift',
+  'security', 'rbac', 'iam', 'hipaa', 'compliance', 'soc2', 'fedramp', 'pii', 'oauth', 'okta',
+  'agile', 'scrum', 'kanban', 'leadership', 'management', 'strategy', 'planning', 'collaboration',
+  'marklogic', 'postgresql', 'mysql', 'dynamodb', 'mongodb', 's3', 'sqs', 'sns', 'lambda', 'ecs', 'eks', 'gke', 'aks',
+  'performance', 'latency', 'slo', 'sla', 'mttr', 'incident', 'oncall', 'capacity', 'scaling', 'autoscaling',
+  'networking', 'vpn', 'loadbalancer', 'firewall', 'bgp', 'dns', 'cdn',
   'finops', 'cost', 'optimization', 'rightsizing', 'budgeting'
 ];
 
-// ─── App Component ────────────────────────────────────────────────────────────
-function App() {
+// ─── Verb / impact helpers ────────────────────────────────────────────────────
+const WEAK_TO_STRONG = {
+  'worked on': 'Engineered', 'helped': 'Spearheaded', 'assisted': 'Co-led',
+  'supported': 'Enabled', 'did': 'Executed', 'made': 'Developed',
+  'was responsible for': 'Owned', 'responsible for': 'Owned',
+  'handled': 'Managed', 'dealt with': 'Resolved',
+  'used': 'Leveraged', 'utilized': 'Leveraged',
+  'involved in': 'Contributed directly to', 'participated in': 'Drove',
+};
+const POWER_VERBS = [
+  'Architected', 'Engineered', 'Orchestrated', 'Spearheaded', 'Designed',
+  'Deployed', 'Automated', 'Optimized', 'Integrated', 'Implemented',
+  'Established', 'Built', 'Delivered', 'Reduced', 'Accelerated', 'Streamlined',
+  'Migrated', 'Secured', 'Owned', 'Modernized',
+];
+const IMPACTS = [
+  ', reducing operational overhead by ~20%',
+  ', improving system reliability by ~30%',
+  ', cutting incident resolution time by ~25%',
+  ', increasing deployment frequency by ~2×',
+  ', eliminating manual toil across the team',
+];
+
+function strengthenBullet(bullet, kwQueue, idx) {
+  let b = bullet.replace(/^[•\-\*]\s*/, '').trim();
+  for (const [w, s] of Object.entries(WEAK_TO_STRONG)) {
+    if (new RegExp(`^${w}\\b`, 'i').test(b)) { b = b.replace(new RegExp(`^${w}\\b`, 'i'), s); break; }
+  }
+  const firstWord = b.split(/\s+/)[0].replace(/[,;]/, '');
+  if (!POWER_VERBS.some(v => v.toLowerCase() === firstWord.toLowerCase())) {
+    const verb = POWER_VERBS[idx % POWER_VERBS.length];
+    if (!/^[A-Z][a-z]+(ed|ing)\b/.test(b)) {
+      b = `${verb} ${b.charAt(0).toLowerCase()}${b.slice(1)}`;
+    }
+  }
+  if (!/\d/.test(b)) b = b.replace(/[.;,]?\s*$/, IMPACTS[idx % IMPACTS.length] + '.');
+
+  const kw = kwQueue[idx % (kwQueue.length || 1)];
+  if (kw && !b.toLowerCase().includes(kw.toLowerCase())) {
+    b = b.replace(/\.$/, ` — deepening ${kw} alignment across the platform.`);
+  }
+  return `• ${b}`;
+}
+
+function rewriteSummary(original, matched, missing, jd) {
+  const yearsMatch = original.match(/(\d+\+?\s*years?)/i);
+  const years = yearsMatch ? yearsMatch[1] : '8+ years';
+  const jdLow = jd.slice(0, 400).toLowerCase();
+  const domain =
+    /ai|ml|llm|gen.?ai/i.test(jdLow) ? 'AI/ML Engineering and Observability'
+      : /sre|reliability|platform/i.test(jdLow) ? 'Site Reliability and Platform Engineering'
+        : /devops|infrastructure/i.test(jdLow) ? 'DevOps and Cloud Infrastructure'
+          : /security|compliance/i.test(jdLow) ? 'Security and Compliance Engineering'
+            : 'Cloud and Software Engineering';
+  const top = matched.slice(0, 5).join(', ') || 'cloud platforms and automation';
+  const miss = missing.slice(0, 3).join(', ');
+  return `PROFESSIONAL SUMMARY\nResults-driven ${domain} professional with ${years} of hands-on experience designing and operating enterprise-grade systems. Proven track record in ${top}, delivering measurable improvements in reliability, performance, and compliance.${miss ? ` Currently expanding expertise in ${miss} to align with evolving role requirements.` : ''}`;
+}
+
+function rewriteExperience(section, missing) {
+  const out = []; let idx = 0;
+  for (const line of section.lines) {
+    if (!line.trim().match(/^[•\-\*]/)) { out.push(line); continue; }
+    out.push(strengthenBullet(line.trim(), missing, idx++));
+  }
+  return `${section.name}\n${out.join('\n')}`;
+}
+
+function rewriteSkills(section, matched, missing) {
+  const orig = section.lines.join('\n').trim();
+  const toAdd = missing.filter(k => !orig.toLowerCase().includes(k.toLowerCase()));
+  return `${section.name}\n${orig}${matched.length ? `\n\nHIGH-RELEVANCE JD-MATCHED\n${matched.slice(0, 8).join('  •  ')}` : ''}${toAdd.length ? `\n\nADD / STRENGTHEN FOR THIS JD\n${toAdd.join('  •  ')}` : ''}`;
+}
+
+function buildRewrittenResume(resume, matched, missing, jd) {
+  const SECTION_RE = /^(PROFESSIONAL SUMMARY|SUMMARY|TECHNICAL SKILLS|SKILLS|CORE COMPETENCIES|PROFESSIONAL EXPERIENCE|EXPERIENCE|EDUCATION|CERTIFICATIONS?|AWARDS?|PROJECTS?)/i;
+  const lines = resume.split('\n');
+  const header = []; let start = 0;
+  for (let i = 0; i < Math.min(7, lines.length); i++) {
+    if (SECTION_RE.test(lines[i].trim()) && i > 0) { start = i; break; }
+    header.push(lines[i]); start = i + 1;
+  }
+  const sections = []; let cur = null;
+  for (let i = start; i < lines.length; i++) {
+    if (SECTION_RE.test(lines[i].trim())) {
+      if (cur) sections.push(cur);
+      cur = { name: lines[i].trim(), lines: [] };
+    } else {
+      if (!cur) cur = { name: '', lines: [] };
+      cur.lines.push(lines[i]);
+    }
+  }
+  if (cur) sections.push(cur);
+
+  const rewritten = sections.map(s => {
+    const n = s.name.toUpperCase();
+    if (/SUMMARY/.test(n)) return rewriteSummary(s.lines.join(' '), matched, missing, jd);
+    if (/COMPETENCIES|SKILLS/.test(n)) return rewriteSkills(s, matched, missing);
+    if (/EXPERIENCE/.test(n)) return rewriteExperience(s, missing);
+    return `${s.name}\n${s.lines.join('\n')}`;
+  });
+
+  return [
+    '═══════════════════════════════════════════════════',
+    '  ATS-OPTIMIZED RESUME  —  Generated by ATSMatch',
+    '═══════════════════════════════════════════════════',
+    '',
+    header.join('\n').trim(),
+    '',
+    ...rewritten,
+    '',
+    '═══════════════════════════════════════════════════',
+    '  Review all additions before submitting.',
+    '═══════════════════════════════════════════════════',
+  ].join('\n\n').trim();
+}
+
+// ─── AnalyzePage  (wraps InputForm + LoadingOverlay + ResultsPage) ────────────
+function AnalyzePage() {
   const [mode, setMode] = useState('input');
   const [results, setResults] = useState(null);
 
   const analyzeResume = (resume, jd) => {
     setMode('loading');
-
     setTimeout(() => {
-      const jdLower = jd.toLowerCase();
-      const resumeLower = resume.toLowerCase();
-
-      const jdKeywords = KEYWORD_LIBRARY.filter(kw => jdLower.includes(kw));
+      const jdL = jd.toLowerCase(), rL = resume.toLowerCase();
+      const jdKw = KEYWORD_LIBRARY.filter(k => jdL.includes(k));
       const matched = [], missing = [];
-      jdKeywords.forEach(kw =>
-        (resumeLower.includes(kw) ? matched : missing).push(kw)
+      jdKw.forEach(k => (rL.includes(k) ? matched : missing).push(k));
+      if (!jdKw.length) { matched.push('leadership', 'management'); missing.push('agile', 'budgeting'); }
+
+      const suggestions = missing.map(k =>
+        `Add a bullet for **${k}**. Example: "Leveraged ${k} to improve [Metric] by [X]% in production."`
       );
+      const rewrittenResume = buildRewrittenResume(resume, matched, missing, jd);
+      const ratio = matched.length / ((matched.length + missing.length) || 1);
+      const overall = Math.min(100, Math.floor(50 + ratio * 45 + Math.random() * 5));
 
-      if (jdKeywords.length === 0) {
-        matched.push('leadership', 'management', 'collaboration');
-        missing.push('agile', 'strategic planning', 'budgeting');
-      }
-
-      const suggestions = missing.map(kw =>
-        `Add a bullet for **${kw}**. Example: "Leveraged ${kw} to improve [Metric] by [X]% in production."`
-      );
-
-      const rewrittenResumeText = buildRewrittenResume(resume, matched, missing, jd);
-
-      const keywordRatio = matched.length / (matched.length + missing.length || 1);
-      const overall = Math.min(100, Math.floor(50 + keywordRatio * 45 + Math.random() * 5));
+      const record = {
+        date: new Date().toLocaleString(),
+        overallScore: overall,
+        jdSnippet: jd.replace(/\s+/g, ' ').slice(0, 80) + '…',
+      };
+      const history = JSON.parse(localStorage.getItem('ats_history') || '[]');
+      history.push(record);
+      localStorage.setItem('ats_history', JSON.stringify(history));
 
       setResults({
         overallScore: overall,
-        keywordScore: Math.min(100, Math.floor(keywordRatio * 100)),
-        formatScore: 92,
-        actionScore: 88,
-        impactScore: 80,
+        keywordScore: Math.min(100, Math.floor(ratio * 100)),
+        formatScore: 92, actionScore: 88, impactScore: 80,
         matchedKeywords: matched,
         missingKeywords: missing,
-        keywordSuggestions: suggestions.length > 0 ? suggestions : [
-          'Add a bullet for **typescript**: "Migrated codebase to TypeScript, reducing runtime errors by 40%."',
-          'Add a bullet for **testing**: "Achieved 90% code coverage via Jest and React Testing Library."'
-        ],
-        rewrittenResume: rewrittenResumeText
+        keywordSuggestions: suggestions,
+        rewrittenResume,
       });
-
       setMode('results');
     }, 2500);
   };
 
-  return (
-    <>
-      <Header />
-      <main>
-        {mode === 'input' && <InputForm onAnalyze={analyzeResume} />}
-        {mode === 'loading' && <LoadingOverlay />}
-        {mode === 'results' && results && (
-          <DashboardResults results={results} onReset={() => setMode('input')} />
-        )}
-      </main>
-    </>
-  );
+  if (mode === 'loading') return <LoadingOverlay />;
+  if (mode === 'results' && results)
+    return <ResultsPage results={results} onReset={() => setMode('input')} />;
+  return <InputForm onAnalyze={analyzeResume} />;
 }
 
-export default App;
+// ─── Root App ─────────────────────────────────────────────────────────────────
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Header />
+      <main>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/analyze" element={<AnalyzePage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="*" element={<Dashboard />} />
+        </Routes>
+      </main>
+    </BrowserRouter>
+  );
+}
