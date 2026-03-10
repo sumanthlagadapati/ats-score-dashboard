@@ -21,6 +21,23 @@ A premium, AI-powered ATS (Applicant Tracking System) resume analysis dashboard 
 
 ---
 
+## 📸 Screenshots
+
+### Dashboard — Hiring Intelligence Command Centre
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Analyze — Drag-and-Drop Resume Upload
+![Analyze Page](docs/screenshots/analyze.png)
+
+### Results — ATS Score, Donut Charts & Keyword Analysis
+![Results Page](docs/screenshots/results.png)
+
+### History — Past Scan Log
+![History Page](docs/screenshots/history.png)
+
+
+---
+
 ## 🛠️ Tech Stack
 
 | Layer | Technology |
