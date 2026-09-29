@@ -47,7 +47,7 @@ A premium, AI-powered ATS (Applicant Tracking System) resume analysis dashboard 
 | Charts | Recharts (RadialBarChart) |
 | File Upload | React Dropzone |
 | PDF Export | jsPDF |
-| Styling | Vanilla CSS (custom design system — Inter font, Deep Indigo + Soft Teal palette) |
+| Styling | Vanilla CSS (Glassmorphism design system — Inter & JetBrains Mono fonts, Brand Blue + Slate palette) |
 | Storage | Browser localStorage (no backend required) |
 
 ---
@@ -113,7 +113,8 @@ ats-score-dashboard/
 ├── public/
 ├── src/
 │   ├── components/
-│   │   ├── Header.jsx          # Sticky nav with React Router links
+│   │   ├── Sidebar.jsx         # New sidebar navigation component
+│   │   ├── Header.jsx          # Top app bar with search and actions
 │   │   ├── InputForm.jsx       # Drag-and-drop upload + paste form
 │   │   ├── LoadingOverlay.jsx  # Animated processing screen
 │   │   └── DashboardResults.jsx
@@ -134,11 +135,12 @@ ats-score-dashboard/
 
 | Token | Value | Usage |
 |---|---|---|
-| `--primary` | `#3F51B5` (Deep Indigo) | Headers, CTAs, primary actions |
-| `--accent` | `#4DB6AC` (Soft Teal) | Highlights, matched keywords, success states |
-| `--warning` | `#FFA726` | Moderate scores, tips |
-| `--danger` | `#EF5350` | Low scores, missing keywords |
-| Font | Inter (Google Fonts) | All text |
+| `--color-primary-500` | `#3b82f6` (Brand Blue) | Headers, CTAs, primary actions, active nav items |
+| `--color-secondary-500` | `#64748b` (Slate) | Muted text, borders, secondary elements |
+| `--color-success` | `#10b981` | High match scores, positive feedback |
+| `--color-warning` | `#f59e0b` | Moderate scores, tips |
+| `--color-error` | `#ef4444` | Low scores, missing keywords |
+| Fonts | Inter & JetBrains Mono | UI text (Inter) & Data/Metrics (JetBrains Mono) |
 
 ---
 

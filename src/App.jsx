@@ -191,19 +191,24 @@ function AnalyzePage() {
   return <InputForm onAnalyze={analyzeResume} />;
 }
 
+import Sidebar from './components/Sidebar';
+
 // ─── Root App ─────────────────────────────────────────────────────────────────
 export default function App() {
   return (
     <BrowserRouter>
-      <Header />
-      <main>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/analyze" element={<AnalyzePage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="*" element={<Dashboard />} />
-        </Routes>
-      </main>
+      <div className="app-layout">
+        <Sidebar />
+        <main className="main-content">
+          <Header />
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/analyze" element={<AnalyzePage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="*" element={<Dashboard />} />
+          </Routes>
+        </main>
+      </div>
     </BrowserRouter>
   );
 }
